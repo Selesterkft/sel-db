@@ -1,0 +1,50 @@
+{
+  "name": "@selesterkft/sel-db",
+  "version": "1.0.1",
+  "description": "Selester DB connection handler",
+  "main": "lib/index.js",
+  "scripts": {
+    "build": "babel src -d lib",
+    "lint": "eslint . --ext .js",
+    "lint:fix": "eslint . --ext .js --fix",
+    "test": "jest --watchAll --runInBand",
+    "test:non-seq": "jest --watchAll",
+    "test:ci": "jest --ci --collectCoverage --reporters=default",
+    "test:cover": "jest --collectCoverage"
+  },
+  "files": [
+    "/lib"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mategyf/sel-db.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/mategyf/sel-db/issues"
+  },
+  "homepage": "https://github.com/mategyf/sel-db#readme",
+  "devDependencies": {
+    "@babel/cli": "^7.16.0",
+    "@babel/core": "^7.16.0",
+    "@babel/node": "^7.16.0",
+    "@babel/preset-env": "^7.16.4",
+    "eslint": "^8.4.1",
+    "eslint-config-airbnb-base": "^15.0.0",
+    "eslint-plugin-import": "^2.25.3",
+    "eslint-plugin-jest": "^25.3.0",
+    "eslint-restricted-globals": "^0.2.0",
+    "jest": "^27.4.3",
+    "typescript": "^4.5.2"
+  },
+  "dependencies": {
+    "tedious": "^14.0.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "coveragePathIgnorePatterns": [
+      "/node_modules/"
+    ]
+  }
+}
