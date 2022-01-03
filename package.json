@@ -17,14 +17,14 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mategyf/sel-db.git"
+    "url": "git+https://github.com/Selesterkft/sel-db.git"
   },
   "author": "",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/mategyf/sel-db/issues"
+    "url": "https://github.com/Selesterkft/sel-db/issues"
   },
-  "homepage": "https://github.com/mategyf/sel-db#readme",
+  "homepage": "https://github.com/Selesterkft/sel-db#readme",
   "devDependencies": {
     "@babel/cli": "^7.16.0",
     "@babel/core": "^7.16.0",
