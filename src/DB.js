@@ -10,11 +10,11 @@ export default class DB {
       this.logger.error = (msg) => logger.error(`sel-db: ${msg}`);
       this.logger.info = (msg) => logger.info(`sel-db: ${msg}`);
     } else {
-      this.replaceLogger();
+      this.logger = DB.replaceLogger();
     }
   }
 
-  initiateConnection(sqlConfig) {
+  async initiateConnection(sqlConfig) {
     this.config = sqlConfig;
     this.connection = new Connection(this.config);
     this.checkSqlConfig();
@@ -39,14 +39,15 @@ export default class DB {
       this.connection.connect((err) => {
         if (err) {
           this.logger.error(
-            `resetConnection: Reopen connection failed: ${err}`,
+            `resetConnection: Reopen connection failed: ${err.message}`,
           );
           reject(err);
+        } else {
+          this.logger.info(
+            'resetConnection: Database connection successfully reset.',
+          );
+          resolve(this.getState());
         }
-        this.logger.info(
-          'resetConnection: Database connection successfully reset.',
-        );
-        resolve(this.getState());
       });
     });
   }
@@ -54,44 +55,50 @@ export default class DB {
   openConnection() {
     return new Promise((resolve, reject) => {
       const state = this.getState();
-      if (state === 'LoggedIn') {
-        this.logger.info('openConnection: Already logged in.');
-        resolve(this.getState());
-      }
 
-      if (state === 'Connecting') {
-        this.logger.info(
-          'openConnection: Already connecting, waiting for completion.',
-        );
-        this.connection.on('connect', (err) => {
-          if (err) {
-            this.logger.error(err);
-            reject(err);
-          }
+      switch (state) {
+        case 'LoggedIn':
+          this.logger.info('openConnection: Already logged in.');
           resolve(this.getState());
-        });
-      } else if (state === 'Final') {
-        this.logger.info(
-          'openConnection: State is Final. Resetting connection.',
-        );
-        this.resetConnection()
-          .then(() => {
-            this.logger.info('openConnection: Connection successfully reset.');
-            resolve(this.getState());
-          })
-          .catch((e) => {
-            this.logger.error(e);
-            reject(e);
+          break;
+        case 'Connecting':
+          this.logger.info(
+            'openConnection: Already connecting, waiting for completion.',
+          );
+          this.connection.on('connect', (err) => {
+            if (err) {
+              reject(err);
+            } else {
+              resolve(this.getState());
+            }
           });
-      } else {
-        this.connection.connect((err) => {
-          if (err) {
-            this.logger.error(err);
-            reject(err);
-          }
-          this.logger.info('openConnection: Database successfully connected.');
-          resolve(this.getState());
-        });
+          break;
+        case 'Final':
+          this.logger.info(
+            'openConnection: State is Final. Resetting connection.',
+          );
+          this.resetConnection()
+            .then(() => {
+              this.logger.info(
+                'openConnection: Connection successfully reset.',
+              );
+              resolve(this.getState());
+            })
+            .catch((e) => {
+              reject(e);
+            });
+          break;
+        default:
+          this.connection.connect((err) => {
+            if (err) {
+              reject(err);
+            } else {
+              this.logger.info(
+                'openConnection: Database successfully connected.',
+              );
+              resolve(this.getState());
+            }
+          });
       }
     });
   }
@@ -102,11 +109,15 @@ export default class DB {
       let columns = [];
       const recordset = [];
 
+      let isRejected = false;
       const request = new Request(sp.procName, (err) => {
         if (err) {
           reject(err);
+          isRejected = true;
         }
       });
+
+      if (isRejected) return;
 
       request.setTimeout = sp.timeOut;
 
@@ -143,7 +154,6 @@ export default class DB {
         }));
       });
 
-      // todo: 'columns' name
       request.on('row', (xxxcolumns) => {
         const record = {};
 
@@ -167,8 +177,8 @@ export default class DB {
       });
   }
 
-  replaceLogger() {
-    this.logger = {
+  static replaceLogger() {
+    return {
       // eslint-disable-next-line no-console
       info: console.log,
       // eslint-disable-next-line no-console
