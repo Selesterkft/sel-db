@@ -1,6 +1,6 @@
 {
   "name": "@selesterkft/sel-db",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Selester DB connection handler",
   "main": "lib/index.js",
   "scripts": {
