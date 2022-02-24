@@ -33,7 +33,6 @@ export default class StoredProcedure {
     // eslint-disable-next-line no-unused-vars
     const [nameStr, optionsStr] = typeStr.replace(')', '').split('(');
     const name = dataTypes[nameStr.toLowerCase()];
-    /* https://tediousjs.github.io/tedious/api-datatypes.html */
     if (!name) {
       throw new Error('Invalid data type!');
     }

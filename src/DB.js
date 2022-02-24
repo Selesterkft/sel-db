@@ -18,10 +18,6 @@ export default class DB {
     this.config = sqlConfig;
     this.connection = new Connection(this.config);
     this.checkSqlConfig();
-    // return this.openConnection();
-    // console.log('calling openconnection');
-    // const result = await this.openConnection();
-    // console.log(`Result: ${result}`);
     return this.openConnection();
   }
 
@@ -43,7 +39,6 @@ export default class DB {
       this.connection.connect((err) => {
         if (err) {
           this.logger.error(
-            // TODO: test this error message
             `resetConnection: Reopen connection failed: ${err.message}`,
           );
           reject(err);
@@ -72,8 +67,6 @@ export default class DB {
           );
           this.connection.on('connect', (err) => {
             if (err) {
-              // TODO: test this case somehow...
-              // this.logger.error(err);
               reject(err);
             } else {
               resolve(this.getState());
@@ -92,15 +85,12 @@ export default class DB {
               resolve(this.getState());
             })
             .catch((e) => {
-              // TODO: test this case
-              // this.logger.error(e);
               reject(e);
             });
           break;
         default:
           this.connection.connect((err) => {
             if (err) {
-              // this.logger.error(err);
               reject(err);
             } else {
               this.logger.info(
@@ -119,7 +109,6 @@ export default class DB {
       let columns = [];
       const recordset = [];
 
-      // TODO: test rejection path
       let isRejected = false;
       const request = new Request(sp.procName, (err) => {
         if (err) {
@@ -165,7 +154,6 @@ export default class DB {
         }));
       });
 
-      // TODO: 'columns' name
       request.on('row', (xxxcolumns) => {
         const record = {};
 
