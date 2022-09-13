@@ -1,17 +1,12 @@
 /* eslint-disable operator-linebreak */
 import { Connection, Request } from 'tedious';
+import constructLogger from './logging/constructLogger';
 
 export default class DB {
   constructor(logger) {
     this.config = {};
     this.connection = {};
-    this.logger = {};
-    if (logger) {
-      this.logger.error = (msg) => logger.error(`sel-db: ${msg}`);
-      this.logger.info = (msg) => logger.info(`sel-db: ${msg}`);
-    } else {
-      this.logger = DB.replaceLogger();
-    }
+    this.logger = constructLogger(logger);
   }
 
   async initiateConnection(sqlConfig) {
@@ -32,23 +27,27 @@ export default class DB {
 
   resetConnection() {
     return new Promise((resolve, reject) => {
-      this.logger.info('resetConnection: Resetting connection.');
+      this.logger.debug('Resetting connection.', 'resetConnection');
       this.dropConnection();
 
       this.connection = new Connection(this.config);
       this.connection.connect((err) => {
         if (err) {
           this.logger.error(
-            `resetConnection: Reopen connection failed: ${err.message}`,
+            `Failed to reopen connection: ${err.message}`,
+            'resetConnection',
           );
           reject(err);
         } else {
-          this.logger.info(
-            'resetConnection: Database connection successfully reset.',
+          this.logger.debug(
+            'Database connection successfully reset.',
+            'resetConnection',
           );
           resolve(this.getState());
         }
       });
+
+      this.registerListeners('resetConnection');
     });
   }
 
@@ -58,12 +57,13 @@ export default class DB {
 
       switch (state) {
         case 'LoggedIn':
-          this.logger.info('openConnection: Already logged in.');
+          this.logger.info('Already logged in.', 'openConnection');
           resolve(this.getState());
           break;
         case 'Connecting':
           this.logger.info(
-            'openConnection: Already connecting, waiting for completion.',
+            'Already connecting, waiting for completion.',
+            'openConnection',
           );
           this.connection.on('connect', (err) => {
             if (err) {
@@ -75,12 +75,14 @@ export default class DB {
           break;
         case 'Final':
           this.logger.info(
-            'openConnection: State is Final. Resetting connection.',
+            'State is Final. Resetting connection.',
+            'openConnection',
           );
           this.resetConnection()
             .then(() => {
               this.logger.info(
-                'openConnection: Connection successfully reset.',
+                'Connection successfully reset.',
+                'openConnection',
               );
               resolve(this.getState());
             })
@@ -94,12 +96,20 @@ export default class DB {
               reject(err);
             } else {
               this.logger.info(
-                'openConnection: Database successfully connected.',
+                'Database successfully connected.',
+                'openConnection',
               );
               resolve(this.getState());
             }
           });
+          this.registerListeners('openConnection');
       }
+    });
+  }
+
+  registerListeners(caller) {
+    this.connection.on('error', (err) => {
+      this.logger.error(err, caller);
     });
   }
 
@@ -217,7 +227,7 @@ export default class DB {
         throw new Error('No user or pass provided!');
       }
     } catch (e) {
-      this.logger.error(e.message);
+      this.logger.error(e.message, 'checkSqlConfig');
       throw new Error(`checkSqlConfig: ${e.message}`);
     }
   }
@@ -254,8 +264,8 @@ export default class DB {
         throw new Error('No user or pass provided!');
       }
     } catch (e) {
-      this.logger.error(e.message);
-      throw new Error(`DB.sanitizeSqlConfig: ${e.message}`);
+      this.logger.error(e.message, 'sanitizeSqlConfig');
+      throw new Error(`sanitizeSqlConfig: ${e.message}`);
     }
 
     return sanitizedConfig;
