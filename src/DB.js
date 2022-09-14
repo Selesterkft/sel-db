@@ -3,6 +3,8 @@ import { Connection, Request } from 'tedious';
 import constructLogger from './logging/constructLogger';
 
 export default class DB {
+  // TODO: move config to the constructor instead of initiateConnection.
+  // This will break API, so major version upgrade is needed...
   constructor(logger) {
     this.config = {};
     this.connection = {};
@@ -57,11 +59,11 @@ export default class DB {
 
       switch (state) {
         case 'LoggedIn':
-          this.logger.info('Already logged in.', 'openConnection');
+          this.logger.debug('Already logged in.', 'openConnection');
           resolve(this.getState());
           break;
         case 'Connecting':
-          this.logger.info(
+          this.logger.debug(
             'Already connecting, waiting for completion.',
             'openConnection',
           );
@@ -80,14 +82,14 @@ export default class DB {
           );
           this.resetConnection()
             .then(() => {
-              this.logger.info(
+              this.logger.debug(
                 'Connection successfully reset.',
                 'openConnection',
               );
               resolve(this.getState());
             })
-            .catch((e) => {
-              reject(e);
+            .catch((err) => {
+              reject(err);
             });
           break;
         default:
@@ -181,9 +183,9 @@ export default class DB {
   async callSP(sp) {
     return this.openConnection()
       .then(() => this.retardedCall(sp))
-      .catch((e) => {
-        this.logger.error(e);
-        throw e;
+      .catch((err) => {
+        this.logger.error(err);
+        throw err;
       });
   }
 
@@ -226,9 +228,9 @@ export default class DB {
       ) {
         throw new Error('No user or pass provided!');
       }
-    } catch (e) {
-      this.logger.error(e.message, 'checkSqlConfig');
-      throw new Error(`checkSqlConfig: ${e.message}`);
+    } catch (err) {
+      this.logger.error(err.message, 'checkSqlConfig');
+      throw new Error(`checkSqlConfig: ${err.message}`);
     }
   }
 
@@ -263,9 +265,9 @@ export default class DB {
       ) {
         throw new Error('No user or pass provided!');
       }
-    } catch (e) {
-      this.logger.error(e.message, 'sanitizeSqlConfig');
-      throw new Error(`sanitizeSqlConfig: ${e.message}`);
+    } catch (err) {
+      this.logger.error(err.message, 'sanitizeSqlConfig');
+      throw new Error(`sanitizeSqlConfig: ${err.message}`);
     }
 
     return sanitizedConfig;
