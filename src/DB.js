@@ -1,6 +1,7 @@
 /* eslint-disable operator-linebreak */
 import { Connection, Request } from 'tedious';
 import constructLogger from './logging/constructLogger';
+import Processor from './Processor';
 
 export default class DB {
   // TODO: move config to the constructor instead of initiateConnection.
@@ -9,12 +10,22 @@ export default class DB {
     this.config = {};
     this.connection = {};
     this.logger = constructLogger(logger);
+    this.processor = new Processor();
   }
 
   async initiateConnection(sqlConfig) {
     this.config = sqlConfig;
     this.connection = new Connection(this.config);
     this.checkSqlConfig();
+    this.processor.setLogger(this.logger);
+    const queryFn = (storedProcedure) => this.openConnection()
+      .then(() => this.retardedCall(storedProcedure))
+      .catch((err) => {
+        this.logger.error(err, 'queryFn');
+        throw err;
+      });
+    this.processor.queryFn = queryFn;
+
     return this.openConnection();
   }
 
@@ -92,6 +103,11 @@ export default class DB {
               reject(err);
             });
           break;
+        case 'SentClientRequest':
+          // If connection is in this state, it is open.
+          // Queue Processor should make sure that a new request isn't called
+          // while in this state.
+          break;
         default:
           this.connection.connect((err) => {
             if (err) {
@@ -166,6 +182,7 @@ export default class DB {
         }));
       });
 
+      // TODO: change name to something decent.
       request.on('row', (xxxcolumns) => {
         const record = {};
 
@@ -181,12 +198,9 @@ export default class DB {
   }
 
   async callSP(sp) {
-    return this.openConnection()
-      .then(() => this.retardedCall(sp))
-      .catch((err) => {
-        this.logger.error(err);
-        throw err;
-      });
+    const callResult = this.processor.query(sp);
+    // .catch((err) => { this.logger.error(err, 'callSP'); });
+    return callResult;
   }
 
   static replaceLogger() {
