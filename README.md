@@ -191,7 +191,18 @@ With `json`:
 
 ```
 
+## Queueing stored procedure calls - Queue Processor
 
+If a procedure is called while another is still being processed by the database, an `EINVALIDSTATE` error will occur.
+This is the notorious 'SentClientRequest state' error. (Check out [Tedious F.E.Q.](http://tediousjs.github.io/tedious/frequently-encountered-problems.html))
+
+```text
+RequestError: Requests can only be made in the LoggedIn state, not the SentClientRequest state
+```
+
+From version 1.2.0 onwards, `sel-db` implements a Queue Processor to execute called procedures sequentially, handling this problem. `callSP` can now be called repeatedly, and the procedures will fill up a waiting queue if the database is busy processing a previous call.
+
+Info level logging will show if a procedure needs to be stalled. This can show that the previous call is too slow or can be helpful for other debugging purposes.
 
 ## API
 
@@ -205,7 +216,7 @@ Creates a new instance of the database connection object. `logger` is an optiona
 
 Async method that initiates a connection with the configuration provided in the object `sqlConfig`. The latter is passed as-is to _tedious_, so check [their docs](http://tediousjs.github.io/tedious/api-connection.html#function_newConnection) on how to set up your connection config. If no `type` is provided for `authentication`, it will be assumed to be `default`.
 
-Use a `.catch` branch (or equivalent) to handle errors in the connection. This is useful if eg. some timeout event produces otherwise uncaught exceptions (see `Known issues`).
+Use a `.catch` branch (or equivalent) to handle errors in the connection. This is can be useful if there's a problem during initial connection (server down, config error etc.).
 
 Returns a promise for the connection state (see `getState()`)
 
@@ -251,7 +262,7 @@ Returns a string containing the state of the connection. This, AFAIK can be as f
 |SENT_ATTENTION|SentAttention|
 |**FINAL**|Final|
 
-Possibly important ones are bolded. The connection needs to be in the `LoggedIn` state in order to process a request, it cannot be done while in the `Initialized` or `Connecting` state. _Sel-db_ will wait till the connection is fully established, so use [initiateConnection](#initiateConnectionsqlConfig).
+Possibly important ones are bolded. The connection needs to be in the `LoggedIn` state in order to process a request, it cannot be done while in the `Initialized`, `Connecting` or `SentClientRequest` state. _Sel-db_ will wait till the connection is fully established, so use [initiateConnection](#initiateConnectionsqlConfig).
 
 This method is not async, so it will return the state at the moment it was called.
 
@@ -292,18 +303,12 @@ Adds an output parameter, uses the same syntax as above. If there are no options
 
 After some time, connections to Azure databases are lost, they switch to the 'Final' state, possibly due to timeout settings.
 
-![Error log image](/assets/img/ECONNRESET_log1.jpg)
-
 If a new call is made to the database while the connection is in the 'Final' state, _sel-db_ will close the connection and initiate a new one automatically. This ensures that calls are processed should this error happen.
 
-Still, the disconnection event throws an uncaught exception, which clogs the logging and potentially the console/terminal running express. Use a catch branch on `initiateConnection()` to handle this.
+Still, an `error` level logging event will occur.
 
-### EINVALIDSTATE - requests made too fast
+error.log:
 
-```text
-RequestError: Requests can only be made in the LoggedIn state, not the SentClientRequest state
+```json
+{"caller":"openConnection","level":"error","message":{"code":"ESOCKET"},"module":"sel-db","timestamp":"2022-09-29T11:26:21.274Z"}
 ```
-
-If a request is followed by another while the database is still processing the first one, an error will occur.
-
-This issue is currently being worked on, but it is low priority.
