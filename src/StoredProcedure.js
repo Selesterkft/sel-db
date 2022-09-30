@@ -34,7 +34,7 @@ export default class StoredProcedure {
     const [nameStr, optionsStr] = typeStr.replace(')', '').split('(');
     const name = dataTypes[nameStr.toLowerCase()];
     if (!name) {
-      throw new Error('Invalid data type!');
+      throw new Error('StoredProcedure: Invalid data type!');
     }
 
     return { type: name, options };

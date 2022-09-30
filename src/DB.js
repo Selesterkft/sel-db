@@ -47,7 +47,7 @@ export default class DB {
       this.connection.connect((err) => {
         if (err) {
           this.logger.error(
-            `Failed to reopen connection: ${err.message}`,
+            `Failed to reset connection: ${err.message}`,
             'resetConnection',
           );
           reject(err);
@@ -70,12 +70,12 @@ export default class DB {
 
       switch (state) {
         case 'LoggedIn':
-          this.logger.debug('Already logged in.', 'openConnection');
+          this.logger.debug('State is \'LoggedIn\'.', 'openConnection');
           resolve(this.getState());
           break;
         case 'Connecting':
           this.logger.debug(
-            'Already connecting, waiting for completion.',
+            'State is \'Connecting\', waiting for completion.',
             'openConnection',
           );
           this.connection.on('connect', (err) => {
@@ -88,7 +88,7 @@ export default class DB {
           break;
         case 'Final':
           this.logger.info(
-            'State is Final. Resetting connection.',
+            'State is \'Final\'. Resetting connection.',
             'openConnection',
           );
           this.resetConnection()
@@ -107,6 +107,10 @@ export default class DB {
           // If connection is in this state, it is open.
           // Queue Processor should make sure that a new request isn't called
           // while in this state.
+          this.logger.debug(
+            'State is \'SentClientRequest\'.',
+            'openConnection',
+          );
           break;
         default:
           this.connection.connect((err) => {
@@ -193,13 +197,13 @@ export default class DB {
         recordset.push(record);
       });
 
+      this.logger.debug(`Calling procedure ${sp.procName}`, 'callSP');
       this.connection.callProcedure(request);
     });
   }
 
   async callSP(sp) {
     const callResult = this.processor.query(sp);
-    // .catch((err) => { this.logger.error(err, 'callSP'); });
     return callResult;
   }
 

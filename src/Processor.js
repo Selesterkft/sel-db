@@ -30,7 +30,7 @@ export default class Processor {
     if (this.queue.length === 0) return;
     if (this.queryRunning) {
       const last = this.queue[this.queue.length - 1];
-      this.logger.info(`Retarding procedure: ${last.query.procName}. Previous still executing.`, 'Queue Processor');
+      this.logger.info(`Retarding procedure: ${last.query.procName}. Queue not empty.`, 'Queue Processor');
       return;
     }
 
