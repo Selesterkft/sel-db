@@ -3,16 +3,18 @@
 // https://stackoverflow.com/a/52309513
 
 export default class Processor {
-  constructor() {
+  constructor(queryFn, logger) {
     this.queue = [];
     this.queryRunning = false;
-    this.logger = {};
-    this.queryFn = {};
+    // this.logger = {};
+    // this.queryFn = {};
+    this.logger = logger;
+    this.queryFn = queryFn;
   }
 
-  setLogger(logger) {
-    this.logger = logger;
-  }
+  // setLogger(logger) {
+  //   this.logger = logger;
+  // }
 
   query(query) {
     return new Promise((resolve, reject) => {
