@@ -6,9 +6,17 @@ This is basically a wrapper that wraps promises around tedious' callbacks.
 
 > **Currently only works with stored procedures!**
 
+> [Migrating from 1.x to 2.x](./docs/migration.md)
+
 Can be used with [@selesterkft/express-logger](https://www.npmjs.com/package/@selesterkft/express-logger).
 
 ## Installation
+
+```bash
+npm i @selesterkft/sel-db
+```
+
+or
 
 ```bash
 yarn add @selesterkft/sel-db
@@ -34,13 +42,13 @@ A basic implementation would be:
 ```javascript
 import { DB, StoredProcedure } from '@selesterkft/sel-db';
 
-// Create an instance of the class
-const db = new DB();
-
 // Create a configuration object. See the API section for details.
 const sqlConfig = {
   server: 'localhost',
-  options: {},
+  options: {
+    // tedious ^15.0.0 defaults this to false
+    trustServerCertificate: true,
+  },
   authentication: {
     type: 'default',
     options: {
@@ -50,14 +58,14 @@ const sqlConfig = {
   },
 };
 
-// Connect to the database (without error-checking)
-await db.initiateConnection(sqlConfig);
+// Create an instance of the class
+const db = new DB(sqlConfig);
 
 // Create a stored procedure
 const sp = new StoredProcedure('countChar');
 // Add parameters to the stored procedure
-sp.addParam('inputVal', 'VARCHAR', 'something', { length: 30 });
-sp.addOutputParam('outputCount', 'int');
+sp.input('inputVal', 'VARCHAR', 'something', { length: 30 });
+sp.output('outputCount', 'int');
 
 // Call the procedure and get the result
 const result = await db.callSP(sp);
@@ -83,7 +91,7 @@ Create a file that exports an instance of the DB class. To keep things organized
 import logger from '@selesterkft/express-logger';
 import { DB } from '@selesterkft/sel-db';
 
-export const sqlConfig = {
+const sqlConfig = {
   server: 'localhost',
   options: {},
   authentication: {
@@ -95,24 +103,10 @@ export const sqlConfig = {
   },
 };
 
-export const db = new DB(logger);
+export const db = new DB(sqlConfig, logger);
 ```
 
-In a place that gets called at init (like `index.js`), initialize the connection:
-
-```javascript
-import { db, sqlConfig } from './db';
-
-// Make sure this runs before any call to the database is performed
-db.initiateConnection(sqlConfig).catch((e) => {
-  // Do some error handling, eg.:
-  logger.error(e.message);
-});
-
-// ...
-```
-
-Then make a function for calling the stored procedure.
+Then make a function for calling the stored procedure. THe connection with the SQL server will be initialized on calling a stored procedure for the first time. If you need to drop the connection, use `db.dropConnection()`.
 
 `countChar.js`
 
@@ -122,8 +116,8 @@ import { db } from './db';
 
 export default async function countChar(str) {
   const sp = new StoredProcedure('countChar');
-  sp.addParam('inputVal', 'VARCHAR', str, { length: 30 });
-  sp.addOutputParam('outputCount', 'int');
+  sp.input('inputVal', 'VARCHAR', str, { length: 30 });
+  sp.output('outputCount', 'int');
 
   const sqlResult = await db.callSP(sp);
 
@@ -208,17 +202,9 @@ Info level logging will show if a procedure needs to be stalled. This can show t
 
 ### Connection
 
-#### **const db = new DB(logger)**
+#### **const db = new DB(sqlConfig[, logger])**
 
-Creates a new instance of the database connection object. `logger` is an optional parameter, a logger object that has a `logger.info` and a `logger.error` method for logging infos and errors respectively. If no logger is provided, logs will be written to the console (via `console.log()` and `console.error()`).
-
-#### **initiateConnection(sqlConfig)**
-
-Async method that initiates a connection with the configuration provided in the object `sqlConfig`. The latter is passed as-is to _tedious_, so check [their docs](http://tediousjs.github.io/tedious/api-connection.html#function_newConnection) on how to set up your connection config. If no `type` is provided for `authentication`, it will be assumed to be `default`.
-
-Use a `.catch` branch (or equivalent) to handle errors in the connection. This is can be useful if there's a problem during initial connection (server down, config error etc.).
-
-Returns a promise for the connection state (see `getState()`)
+Creates a new instance of the database connection object with the configuration parameters given in `sqlConfig`. `logger` is an optional parameter, a logger object that has a `logger.debug`, a `logger.info` and a `logger.error` method for logging infos and errors respectively. If no logger is provided, logs will be written to the console (via `console.log()` and `console.error()`).
 
 #### **callSP(sp)**
 
@@ -236,7 +222,7 @@ Returns an object containing the results of the call. The example stored procedu
 }
 ```
 
-Output variables of the stored procedure will be in the `output: {}` object, their keys will be the value given in the `name` parameter of [`addOutputParam()`](#addoutputparamname-type-value-options).
+Output variables of the stored procedure will be in the `output: {}` object, their keys will be the value given in the `name` parameter of [`output()`](#outputname-type-value-options).
 
 #### **dropConnection()**
 
@@ -262,17 +248,19 @@ Returns a string containing the state of the connection. This, AFAIK can be as f
 |SENT_ATTENTION|SentAttention|
 |**FINAL**|Final|
 
-Possibly important ones are bolded. The connection needs to be in the `LoggedIn` state in order to process a request, it cannot be done while in the `Initialized`, `Connecting` or `SentClientRequest` state. _Sel-db_ will wait till the connection is fully established, so use [initiateConnection](#initiateConnectionsqlConfig).
+Possibly important ones are bolded. The connection needs to be in the `LoggedIn` state in order to process a request, it cannot be done while in the `Initialized`, `Connecting` or `SentClientRequest` state. _Sel-db_ will establish the connection on the first call to a stored procedure and will re-initiate it if the connection gets broken. If a previous call is being processed (`SentClientRequest`), a Queue Processor will make sure the next call will wait for its turn.
 
 This method is not async, so it will return the state at the moment it was called.
 
 ### Stored procedures
 
-#### **const sp = new StoredProcedure(procedureName)**
+#### **const sp = new StoredProcedure('procedureName')**
 
 Creates a new stored procedure with the name `procedureName`, which should be the equivalent of the procedure's name in your SQL server.
 
-#### **addParam(name, type, value, options)**
+#### **input(name, type, value, options)**
+
+> Possible overrides: addParam(...), addParameter(...)
 
 Adds an input parameter to the procedure, to be called on the instantiated stored procedure object.
 
@@ -287,15 +275,16 @@ Adds an input parameter to the procedure, to be called on the instantiated store
   >
   > `scale` for Numeric, Decimal, Time, DateTime2, DateTimeOffset
 
-#### **addOutputParam(name, type, value, options)**
+#### **output(name, type, value, options)**
+
+> Possible overrides: addOutputParam(...), addOutputParameter(...)
 
 Adds an output parameter, uses the same syntax as above. If there are no options needed, `value` and `options` can be omitted, otherwise define `value` as an empty string.
 
 ```javascript
-  sp.addOutputParam('out1', 'int');
-  sp.addOutputParam('out2', 'nvarchar', '', { length: 'max' });
+  sp.output('out1', 'int');
+  sp.output('out2', 'nvarchar', '', { length: 'max' });
 ```
-
 
 ## Known issues
 
